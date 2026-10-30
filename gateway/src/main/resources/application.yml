@@ -1,0 +1,77 @@
+server:
+  port: 8081
+  shutdown: graceful
+
+spring:
+  application:
+    name: api-rate-limiter-gateway
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
+      port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Headers Access-Control-Expose-Headers, RETAIN_UNIQUE
+      routes:
+        - id: protected-api-route
+          uri: ${BACKEND_INTERNAL_URL:http://localhost:8080}
+          predicates:
+            - Path=/protected-api/**
+          filters:
+            - name: DistributedRateLimiter
+
+        - id: backend-api-route
+          uri: ${BACKEND_INTERNAL_URL:http://localhost:8080}
+          predicates:
+            - Path=/api/**
+
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:3000"
+              - "http://127.0.0.1:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            exposedHeaders:
+              - "X-RateLimit-Limit"
+              - "X-RateLimit-Remaining"
+              - "X-RateLimit-Reset"
+              - "X-RateLimit-Algorithm"
+              - "Retry-After"
+            allowCredentials: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:false}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+
+ratelimiter:
+  fail-open: ${RATE_LIMIT_FAIL_OPEN:false}
+  backend-url: ${BACKEND_INTERNAL_URL:http://localhost:8080}

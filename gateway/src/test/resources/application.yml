@@ -1,0 +1,17 @@
+server:
+  port: 0
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: protected-test-route
+          uri: http://localhost:8080
+          predicates:
+            - Path=/protected-api/**
+          filters:
+            - name: DistributedRateLimiter
+
+ratelimiter:
+  fail-open: true
+  backend-url: http://localhost:8080
